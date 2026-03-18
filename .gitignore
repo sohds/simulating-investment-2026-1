@@ -205,3 +205,14 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Claude Code
+CLAUDE.md
+
+# Project-specific
+config/config.yaml              # 계좌번호 등 민감 정보 포함
+data/
+logs/
+!data/supply_demand/.gitkeep
+!logs/.gitkeep
+.DS_Store

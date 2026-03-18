@@ -1,0 +1,8 @@
+pykrx
+pykiwoom
+PyQt5
+pandas
+numpy
+pyyaml
+schedule
+FinanceDataReader
