@@ -263,13 +263,23 @@ python src/scheduler.py --now
 
 ## 기술 스택
 
-| 분류 | 라이브러리 |
+| 분류 | 라이브러리 | 버전 |
+|---|---|---|
+| 수급 데이터 수집 | `pykrx` | 1.2.4 |
+| 수급 데이터 수집 | `finance-datareader` | 0.9.110 |
+| OpenAPI 연동 | `pykiwoom` | Windows 전용 |
+| OpenAPI 연동 | `PyQt5` | Windows 전용 |
+| 데이터 처리 | `pandas` | 2.3.3 |
+| 데이터 처리 | `numpy` | 1.26.4 |
+| 스케줄링 | `schedule` | 1.2.2 |
+| 설정 관리 | `pyyaml` | 6.0.3 |
+
+### Python 버전
+
+| 환경 | 버전 |
 |---|---|
-| 수급 데이터 수집 | `pykrx`, `FinanceDataReader` |
-| OpenAPI 연동 | `pykiwoom`, `PyQt5` |
-| 데이터 처리 | `pandas`, `numpy` |
-| 스케줄링 | `schedule` |
-| 설정 관리 | `pyyaml` |
+| Mac (개발·테스트) | Python 3.13.9 |
+| Windows (운영) | Python 3.9 이상 권장 |
 
 ---
 

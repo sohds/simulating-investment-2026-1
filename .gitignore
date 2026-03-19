@@ -138,6 +138,7 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.venv_simul/
 env/
 venv/
 ENV/
@@ -210,6 +211,7 @@ __marimo__/
 CLAUDE.md
 
 # Project-specific
+TO-DOs.md
 config/config.yaml              # 계좌번호 등 민감 정보 포함
 data/
 logs/

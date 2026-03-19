@@ -5,4 +5,4 @@ pandas
 numpy
 pyyaml
 schedule
-FinanceDataReader
+finance-datareader
