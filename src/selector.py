@@ -146,8 +146,9 @@ def run(
     df = load_supply_data(date)
     print(f"  전체 종목 수: {len(df)}")
 
-    df = build_universe(df, top_n=100)
-    print(f"  유니버스 (외국인∩기관 상위 100): {len(df)}개")
+    universe_top_n = config["selection"].get("universe_top_n", 100)
+    df = build_universe(df, top_n=universe_top_n)
+    print(f"  유니버스 (외국인∩기관 상위 {universe_top_n}): {len(df)}개")
 
     df = apply_filters(df, config)
     print(f"  필터 후 (시총·거래대금): {len(df)}개")

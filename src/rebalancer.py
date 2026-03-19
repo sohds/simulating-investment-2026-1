@@ -4,6 +4,10 @@ rebalancer.py
 현재 보유 종목과 신규 선정 종목을 비교해
 편출(매도) / 편입(매수) 주문을 실행하는 리밸런싱 모듈.
 
+그룹 기반 리밸런싱:
+    - GN 기간의 시그널(수급 데이터)로 종목을 선정
+    - GN+1 기간 시작 시 편출·편입 주문 실행
+
 매도 우선순위:
     1. 편출 종목 (선정 리스트에서 제외된 종목) — 전량 매도
     2. 손절 조건 (-8%) — 즉시 전량 매도
@@ -145,8 +149,17 @@ def execute_rebalance(
     deposit = api.get_deposit()  # 매도 체결 후 예수금 재조회
     holdings_value = 0
     if not holdings.empty:
-        # 편출 종목 제외한 보유금액 합산
-        remaining = holdings[~holdings["종목코드"].isin(exit_codes)]
+        # 편출 종목 제외 + 조건매도(분할매도) 수량 차감 후 실제 잔여 보유금액 산출
+        sold_in_condition: dict = {}
+        for code, _, qty, _ in condition_orders:
+            sold_in_condition[code] = sold_in_condition.get(code, 0) + qty
+
+        remaining = holdings[~holdings["종목코드"].isin(exit_codes)].copy()
+        remaining["보유수량"] = remaining.apply(
+            lambda r: max(0, r["보유수량"] - sold_in_condition.get(r["종목코드"], 0)),
+            axis=1,
+        )
+        remaining = remaining[remaining["보유수량"] > 0]
         holdings_value = int((remaining["현재가"] * remaining["보유수량"]).sum())
 
     total_value = deposit + holdings_value
@@ -179,16 +192,19 @@ def execute_rebalance(
     }
 
 
-def save_log(result: dict, date: str) -> None:
+def save_log(result: dict, date: str, group_name: str = "") -> None:
     """리밸런싱 이력을 logs/rebalance_history.csv에 추가."""
     log_path = "logs/rebalance_history.csv"
     os.makedirs("logs", exist_ok=True)
+
+    fieldnames = ["날짜", "그룹", "종목코드", "종목명", "수량", "구분", "주문번호"]
 
     rows = []
     for key in ["편출", "조건매도", "편입"]:
         for item in result.get(key, []):
             rows.append({
                 "날짜":    date,
+                "그룹":    group_name,
                 "종목코드": item["종목코드"],
                 "종목명":  item["종목명"],
                 "수량":    item["수량"],
@@ -202,9 +218,7 @@ def save_log(result: dict, date: str) -> None:
 
     file_exists = os.path.isfile(log_path)
     with open(log_path, "a", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["날짜", "종목코드", "종목명", "수량", "구분", "주문번호"]
-        )
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         if not file_exists:
             writer.writeheader()
         writer.writerows(rows)
@@ -213,35 +227,42 @@ def save_log(result: dict, date: str) -> None:
 
 
 def run(
-    date: Optional[str] = None,
+    signal_date: Optional[str] = None,
+    group_name: str = "",
     config_path: str = "config/config.yaml",
 ) -> None:
     """메인 리밸런싱 실행 함수 (Windows 전용).
 
     Steps:
-        1. 종목 선정 (selector.run)
+        1. 종목 선정 (시그널 그룹 마감일 기준 데이터 사용)
         2. 키움 API 로그인
         3. 편출 → 조건매도 → 편입 주문 실행
         4. 이력 CSV 저장
 
     Args:
-        date: 기준일 "YYYYMMDD". None이면 오늘.
+        signal_date: 시그널 수집 마감일 "YYYYMMDD". None이면 오늘.
+        group_name: 현재 투자 그룹 이름 (예: "G5"). 이력 기록용.
         config_path: config.yaml 경로
     """
     from PyQt5.QtWidgets import QApplication
 
     config = load_config(config_path)
 
-    if date is None:
-        date = datetime.today().strftime("%Y%m%d")
+    if signal_date is None:
+        signal_date = datetime.today().strftime("%Y%m%d")
 
-    print(f"\n{'='*52}")
-    print(f"  리밸런싱 실행: {date}")
-    print(f"{'='*52}")
+    today = datetime.today().strftime("%Y%m%d")
 
-    # Step 1. 종목 선정
-    print("\n[Step 1] 종목 선정")
-    selected = select_stocks(date=date, config_path=config_path)
+    print(f"\n{'='*56}")
+    if group_name:
+        print(f"  리밸런싱 실행  |  투자 그룹: {group_name}  |  시그널: {signal_date}")
+    else:
+        print(f"  리밸런싱 실행  |  시그널: {signal_date}")
+    print(f"{'='*56}")
+
+    # Step 1. 종목 선정 (시그널 날짜 기준)
+    print(f"\n[Step 1] 종목 선정 (시그널 마감일: {signal_date})")
+    selected = select_stocks(date=signal_date, config_path=config_path)
 
     if selected.empty:
         print("[중단] 선정된 종목이 없습니다.")
@@ -259,7 +280,7 @@ def run(
 
     # Step 4. 이력 저장
     print("\n[Step 4] 이력 저장")
-    save_log(result, date)
+    save_log(result, today, group_name)
 
     n_exit  = len(result["편출"])
     n_cond  = len(result["조건매도"])
@@ -268,4 +289,5 @@ def run(
 
 
 if __name__ == "__main__":
-    run()
+    # 단독 실행: 오늘 날짜를 시그널로 사용
+    run(signal_date=sys.argv[1] if len(sys.argv) > 1 else None)
