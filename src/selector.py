@@ -160,6 +160,10 @@ def run(
     print(f"\n[선정 결과] {len(selected)}개 종목")
     print(selected[display_cols].to_string())
 
+    save_path = f"data/supply_demand/selected_{date}.csv"
+    selected[display_cols].to_csv(save_path, encoding="utf-8-sig")
+    print(f"[저장] {save_path}")
+
     return selected
 
 

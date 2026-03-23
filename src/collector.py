@@ -16,8 +16,35 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
+import requests
 import yaml
 from pykrx import stock
+
+
+def _inject_krx_session(jsessionid: str, extra_cookies: str = "") -> None:
+    """KRX 로그인 세션 쿠키를 pykrx 요청에 주입한다.
+
+    KRX가 2025-12-27부터 로그인을 필수화하여 pykrx 비인증 요청이 차단됨.
+    브라우저에서 복사한 JSESSIONID를 여기서 주입하면 인증 우회 가능.
+
+    Args:
+        jsessionid: 브라우저 개발자 도구 Application > Cookies에서 복사한 JSESSIONID 값
+        extra_cookies: __smVisitorID 등 추가 쿠키 문자열 (선택)
+    """
+    cookie_str = f"JSESSIONID={jsessionid}"
+    if extra_cookies:
+        cookie_str += f"; {extra_cookies}"
+
+    original_post = requests.post
+
+    def patched_post(url, *args, **kwargs):
+        if "data.krx.co.kr" in url:
+            headers = kwargs.get("headers", {}) or {}
+            headers["Cookie"] = cookie_str
+            kwargs["headers"] = headers
+        return original_post(url, *args, **kwargs)
+
+    requests.post = patched_post
 
 
 def load_config(config_path: str = "config/config.yaml") -> dict:
@@ -186,5 +213,13 @@ def collect_all(
 
 
 if __name__ == "__main__":
+    # KRX 로그인 세션 주입 (2025-12-27 이후 필수)
+    # config/config.yaml의 krx_session 항목에 JSESSIONID 값을 입력할 것
+    _cfg = load_config()
+    _session = _cfg.get("krx_session", {})
+    _inject_krx_session(
+        jsessionid=_session.get("jsessionid", ""),
+        extra_cookies=_session.get("extra_cookies", ""),
+    )
     date_arg = sys.argv[1] if len(sys.argv) > 1 else None
     collect_all(end_date=date_arg)
