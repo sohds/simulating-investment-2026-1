@@ -56,6 +56,9 @@ def build_universe(df: pd.DataFrame, top_n: int = 100) -> pd.DataFrame:
     foreign_top = set(df.nlargest(top_n, "외국인_장기_순매수").index)
     inst_top = set(df.nlargest(top_n, "기관_장기_순매수").index)
     universe = foreign_top & inst_top
+    if not universe:
+        print("  [경고] 유니버스가 비어 있습니다 (외국인∩기관 교집합 없음). 종목 선정을 중단합니다.")
+        return pd.DataFrame(columns=df.columns)
     return df.loc[list(universe)]
 
 
@@ -150,8 +153,15 @@ def run(
     df = build_universe(df, top_n=universe_top_n)
     print(f"  유니버스 (외국인∩기관 상위 {universe_top_n}): {len(df)}개")
 
+    if df.empty:
+        return pd.DataFrame()
+
     df = apply_filters(df, config)
     print(f"  필터 후 (시총·거래대금): {len(df)}개")
+
+    if df.empty:
+        print("  [경고] 필터 후 종목이 0개입니다. 조건을 완화하거나 데이터를 확인하세요.")
+        return pd.DataFrame()
 
     df = calc_supply_strength(df, config)
     selected = select_stocks(df, config)
