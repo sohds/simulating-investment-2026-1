@@ -109,7 +109,7 @@ def collect_market_cap(date: str, market: str = "ALL") -> pd.DataFrame:
 def collect_avg_trading_value(end_date: str, days: int = 60) -> pd.Series:
     """
     end_date 기준 최근 days 영업일의 일별 거래대금 평균 산출.
-    API 호출 제한 방지를 위해 호출 간 0.5초 대기합니다.
+    API 호출 제한 방지를 위해 호출 간 0.5초 대기하며, 실패 시 최대 3회 재시도합니다.
 
     Args:
         end_date: 기준일 "YYYYMMDD"
@@ -122,11 +122,22 @@ def collect_avg_trading_value(end_date: str, days: int = 60) -> pd.Series:
 
     daily_volumes = []
     for i, date in enumerate(trading_dates):
-        df = stock.get_market_cap_by_ticker(date, "ALL")
-        daily_volumes.append(df["거래대금"].rename(date))
+        for attempt in range(3):
+            try:
+                df = stock.get_market_cap_by_ticker(date, "ALL")
+                daily_volumes.append(df["거래대금"].rename(date))
+                break
+            except Exception as e:
+                if attempt == 2:
+                    print(f"    [경고] {date} 거래대금 수집 실패 (3회 재시도 초과): {e}")
+                else:
+                    time.sleep(2 ** attempt)  # 1초, 2초 백오프
         time.sleep(0.5)
         if (i + 1) % 10 == 0:
             print(f"    거래대금 수집 중... {i + 1}/{days}일")
+
+    if not daily_volumes:
+        raise RuntimeError("거래대금 데이터를 하나도 수집하지 못했습니다.")
 
     combined = pd.concat(daily_volumes, axis=1).fillna(0)
     return combined.mean(axis=1).rename("평균거래대금")
