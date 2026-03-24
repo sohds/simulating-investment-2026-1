@@ -105,8 +105,12 @@ def select_stocks(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     단기·장기 수급 강도 상위 top_n씩 선정 후 합산, 최대 max_stocks 종목 반환.
     양쪽에 모두 선정된 종목은 선정_가중치 = 2 (중복 가중치).
 
+    정렬 기준:
+        1순위: 선정_가중치 (2 > 1)
+        2순위: max(단기_수급강도, 장기_수급강도) — 어느 한쪽이 높으면 공정하게 반영
+
     Returns:
-        선정 종목 DataFrame (가중치 내림차순, 수급강도 내림차순 정렬)
+        선정 종목 DataFrame (가중치 내림차순, 최대수급강도 내림차순 정렬)
     """
     top_n = config["selection"]["top_n"]
     max_stocks = config["selection"]["max_stocks"]
@@ -119,8 +123,9 @@ def select_stocks(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     result["선정_가중치"] = result.index.map(
         lambda t: 2 if t in short_top and t in long_top else 1
     )
+    result["최대_수급강도"] = result[["단기_수급강도", "장기_수급강도"]].max(axis=1)
     result = result.sort_values(
-        ["선정_가중치", "단기_수급강도"], ascending=[False, False]
+        ["선정_가중치", "최대_수급강도"], ascending=[False, False]
     )
     return result.head(max_stocks)
 
@@ -166,7 +171,7 @@ def run(
     df = calc_supply_strength(df, config)
     selected = select_stocks(df, config)
 
-    display_cols = ["종목명", "단기_수급강도", "장기_수급강도", "시가총액", "선정_가중치"]
+    display_cols = ["종목명", "단기_수급강도", "장기_수급강도", "최대_수급강도", "시가총액", "선정_가중치"]
     print(f"\n[선정 결과] {len(selected)}개 종목")
     print(selected[display_cols].to_string())
 
