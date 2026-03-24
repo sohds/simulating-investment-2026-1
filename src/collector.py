@@ -228,7 +228,11 @@ def collect_all(
         .join(avg_trading, how="outer")
     )
     df.index.name = "티커"
-    df = df.fillna(0)
+    # 종목명(문자열)은 fillna 대상에서 제외, 숫자 컬럼만 0으로 채움
+    numeric_cols = df.select_dtypes(include="number").columns
+    df[numeric_cols] = df[numeric_cols].fillna(0)
+    if "종목명" in df.columns:
+        df["종목명"] = df["종목명"].fillna("")
 
     save_dir = "data/supply_demand"
     os.makedirs(save_dir, exist_ok=True)
