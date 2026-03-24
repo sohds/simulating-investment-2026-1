@@ -9,7 +9,6 @@ kiwoom_api.py
     python src/kiwoom_api.py    # 연결 테스트 (예수금·보유 종목 출력)
 """
 
-import time
 from datetime import datetime
 from typing import Optional
 
@@ -34,15 +33,22 @@ class KiwoomAPI:
     OAuth2 client_credentials 방식으로 토큰을 발급하고,
     Bearer 토큰을 Authorization 헤더에 실어 각 API를 호출합니다.
     모의투자 전용 (config.yaml mock: true).
+
+    API 경로 및 api-id 매핑 (공식 문서 기준):
+        예수금 조회       kt00001  POST /api/dostk/acnt
+        계좌평가/보유종목  kt00004  POST /api/dostk/acnt
+        주식 현재가       ka10001  POST /api/dostk/stkinfo
+        주식 매수         kt10000  POST /api/dostk/ordr
+        주식 매도         kt10001  POST /api/dostk/ordr
     """
 
     def __init__(self, config_path: str = "config/config.yaml"):
         self.config = load_config(config_path)
-        self.acc_no  = str(self.config["account"]["number"])
-        self.appkey  = self.config["account"]["appkey"]     # config.yaml에 입력 필요
-        self.secretkey = self.config["account"]["secretkey"]  # config.yaml에 입력 필요
-        self.mock    = self.config["account"].get("mock", True)
-        self.base_url = MOCK_BASE_URL if self.mock else REAL_BASE_URL
+        self.acc_no    = str(self.config["account"]["number"])
+        self.appkey    = self.config["account"]["appkey"]
+        self.secretkey = self.config["account"]["secretkey"]
+        self.mock      = self.config["account"].get("mock", True)
+        self.base_url  = MOCK_BASE_URL if self.mock else REAL_BASE_URL
 
         self._token: Optional[str] = None
         self._token_expires: Optional[datetime] = None
@@ -83,15 +89,17 @@ class KiwoomAPI:
             or (self._token_expires - datetime.now()).total_seconds() < 300
         ):
             self._fetch_token()
-        # _fetch_token이 성공했으면 반드시 _token이 설정됨 (실패 시 raise_for_status로 예외)
         assert self._token is not None
         return self._token
 
-    @property
-    def _headers(self) -> dict:
+    def _headers(self, api_id: str) -> dict:
+        """공통 요청 헤더 생성."""
         return {
-            "Authorization":  f"Bearer {self._get_token()}",
-            "Content-Type":   "application/json;charset=UTF-8",
+            "Authorization": f"Bearer {self._get_token()}",
+            "Content-Type":  "application/json;charset=UTF-8",
+            "api-id":        api_id,
+            "cont-yn":       "N",
+            "next-key":      "",
         }
 
     def connect(self) -> None:
@@ -104,47 +112,51 @@ class KiwoomAPI:
     def get_deposit(self) -> int:
         """주문 가능 예수금 조회 (원).
 
-        TODO: https://openapi.kiwoom.com/guide/apiguide 에서
-              정확한 endpoint path 및 응답 필드명 확인 후 수정.
+        api-id: kt00001
+        endpoint: POST /api/dostk/acnt
+        response field: ord_alow_amt (주문가능금액)
         """
-        # TODO: 실제 엔드포인트 경로를 공식 문서에서 확인하여 교체
-        url = f"{self.base_url}/api/dostk/acnt"  # TODO: verify endpoint
-        resp = requests.get(
+        url = f"{self.base_url}/api/dostk/acnt"
+        resp = requests.post(
             url,
-            headers={**self._headers, "api_id": "kt13001"},  # TODO: verify TR id
-            params={"acnt_no": self.acc_no},
+            headers=self._headers("kt00001"),
+            json={"qry_tp": "1"},
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
 
-        # TODO: 응답 JSON 구조 확인 후 실제 필드명으로 교체
-        raw = str(data.get("ord_psbl_cash", 0)).replace(",", "")
-        return int(raw)
+        if data.get("return_code", -1) != 0:
+            raise RuntimeError(f"예수금 조회 실패: {data.get('return_msg')}")
+
+        raw = str(data.get("ord_alow_amt", 0)).replace(",", "")
+        return int(raw) if raw else 0
 
     def get_holdings(self) -> pd.DataFrame:
         """보유 종목 조회.
 
-        TODO: https://openapi.kiwoom.com/guide/apiguide 에서
-              정확한 endpoint path 및 응답 필드명 확인 후 수정.
+        api-id: kt00004
+        endpoint: POST /api/dostk/acnt
+        response list field: stk_acnt_evlt_prst
 
         Returns:
             columns=[종목코드, 종목명, 보유수량, 매입단가, 현재가, 평가손익, 수익률]
             보유 종목 없으면 빈 DataFrame 반환.
         """
-        # TODO: 실제 엔드포인트 경로를 공식 문서에서 확인하여 교체
-        url = f"{self.base_url}/api/dostk/acnt"  # TODO: verify endpoint
-        resp = requests.get(
+        url = f"{self.base_url}/api/dostk/acnt"
+        resp = requests.post(
             url,
-            headers={**self._headers, "api_id": "kt13002"},  # TODO: verify TR id
-            params={"acnt_no": self.acc_no},
+            headers=self._headers("kt00004"),
+            json={"qry_tp": "1", "dmst_stex_tp": "KRX"},
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
 
-        # TODO: 응답 JSON 구조 확인 후 실제 키 이름으로 교체
-        items = data.get("acnt_evlt_remn_indv_list", [])
+        if data.get("return_code", -1) != 0:
+            raise RuntimeError(f"보유종목 조회 실패: {data.get('return_msg')}")
+
+        items = data.get("stk_acnt_evlt_prst", [])
         if not items:
             return pd.DataFrame(
                 columns=["종목코드", "종목명", "보유수량", "매입단가", "현재가", "평가손익", "수익률"]
@@ -153,13 +165,13 @@ class KiwoomAPI:
         rows = []
         for item in items:
             rows.append({
-                "종목코드": item.get("stk_cd", ""),          # TODO: verify field name
-                "종목명":   item.get("stk_nm", ""),          # TODO: verify field name
+                "종목코드": item.get("stk_cd", ""),
+                "종목명":   item.get("stk_nm", ""),
                 "보유수량": int(str(item.get("rmnd_qty", 0)).replace(",", "")),
-                "매입단가": int(str(item.get("pchs_avg_pric", 0)).replace(",", "")),
-                "현재가":   int(str(item.get("cur_prc", 0)).replace(",", "").lstrip("-")),
-                "평가손익": int(str(item.get("evlt_pfls", 0)).replace(",", "")),
-                "수익률":   float(str(item.get("pfls_rt", 0)).replace(",", "")),
+                "매입단가": int(str(item.get("avg_prc", 0)).replace(",", "")),
+                "현재가":   abs(int(str(item.get("cur_prc", 0)).replace(",", "").lstrip("-"))),
+                "평가손익": int(str(item.get("pl_amt", 0)).replace(",", "")),
+                "수익률":   float(str(item.get("pl_rt", 0)).replace(",", "")),
             })
 
         return pd.DataFrame(rows)
@@ -167,34 +179,36 @@ class KiwoomAPI:
     def get_current_price(self, code: str) -> int:
         """종목 현재가 조회 (원).
 
-        TODO: https://openapi.kiwoom.com/guide/apiguide 에서
-              정확한 endpoint path 및 응답 필드명 확인 후 수정.
+        api-id: ka10001
+        endpoint: POST /api/dostk/stkinfo
+        response field: cur_prc
 
         Args:
             code: 종목 코드 (예: "005930")
         """
-        # TODO: 실제 엔드포인트 경로를 공식 문서에서 확인하여 교체
-        url = f"{self.base_url}/api/dostk/stkbasicinfo"  # TODO: verify endpoint
-        resp = requests.get(
+        url = f"{self.base_url}/api/dostk/stkinfo"
+        resp = requests.post(
             url,
-            headers={**self._headers, "api_id": "ka10001"},  # TODO: verify TR id
-            params={"stk_cd": code},
+            headers=self._headers("ka10001"),
+            json={"stk_cd": code},
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
 
-        # TODO: 응답 JSON 구조 확인 후 실제 필드명으로 교체
+        if data.get("return_code", -1) != 0:
+            raise RuntimeError(f"현재가 조회 실패 [{code}]: {data.get('return_msg')}")
+
         raw = str(data.get("cur_prc", 0)).replace(",", "").lstrip("-")
-        return abs(int(raw))
+        return abs(int(raw)) if raw else 0
 
     # ── 주문 ────────────────────────────────────────────────────────
 
     def buy(self, code: str, qty: int) -> str:
         """시장가 매수 주문.
 
-        TODO: https://openapi.kiwoom.com/guide/apiguide 에서
-              정확한 endpoint path 및 요청 body 필드명 확인 후 수정.
+        api-id: kt10000
+        endpoint: POST /api/dostk/ordr
 
         Args:
             code: 종목 코드
@@ -208,6 +222,9 @@ class KiwoomAPI:
     def sell(self, code: str, qty: int) -> str:
         """시장가 매도 주문.
 
+        api-id: kt10001
+        endpoint: POST /api/dostk/ordr
+
         Args:
             code: 종목 코드
             qty:  매도 수량
@@ -220,37 +237,35 @@ class KiwoomAPI:
     def _send_order(self, code: str, qty: int, order_side: str) -> str:
         """주문 실행 공통 로직.
 
-        TODO: https://openapi.kiwoom.com/guide/apiguide 에서
-              정확한 endpoint path, TR id, 요청 body 필드명 확인 후 수정.
-
         Args:
             code:       종목 코드
             qty:        수량
             order_side: "buy" 또는 "sell"
         """
-        # TODO: 실제 엔드포인트 경로를 공식 문서에서 확인하여 교체
-        url = f"{self.base_url}/api/dostk/order"  # TODO: verify endpoint
+        api_id = "kt10000" if order_side == "buy" else "kt10001"
+        url = f"{self.base_url}/api/dostk/ordr"
 
-        # TODO: 응답 JSON 구조 확인 후 실제 필드명으로 교체
         body = {
-            "acnt_no":   self.acc_no,
-            "stk_cd":    code,
-            "ord_qty":   str(qty),
-            "ord_pric":  "0",          # 시장가는 0
-            "ord_dvsn":  "03",         # 03 = 시장가  TODO: verify code
-            "buy_sell_gb": "1" if order_side == "buy" else "2",  # TODO: verify
+            "dmst_stex_tp": "KRX",
+            "stk_cd":       code,
+            "ord_qty":      str(qty),
+            "trde_tp":      "3",    # 3 = 시장가
+            "ord_uv":       "0",    # 시장가는 0
         }
 
         resp = requests.post(
             url,
-            headers={**self._headers, "api_id": "kt00001"},  # TODO: verify TR id
+            headers=self._headers(api_id),
             json=body,
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
 
-        # TODO: 응답 JSON 구조 확인 후 실제 주문번호 필드명으로 교체
+        if data.get("return_code", -1) != 0:
+            print(f"  [주문 실패] {data.get('return_msg')}")
+            return ""
+
         return str(data.get("ord_no", ""))
 
 
