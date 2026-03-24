@@ -140,6 +140,9 @@ def collect_all(
     메인 수집 함수. end_date 기준 수급 데이터를 수집하여
     data/supply_demand/{end_date}.csv 에 저장합니다.
 
+    scheduler.py에서 import해서 호출할 때도 KRX 세션이 주입되도록
+    이 함수 내에서 직접 세션을 주입합니다.
+
     Args:
         end_date: 기준일 "YYYYMMDD". None이면 오늘.
         config_path: config.yaml 경로
@@ -148,6 +151,13 @@ def collect_all(
         저장된 파일 경로
     """
     config = load_config(config_path)
+
+    # KRX 세션 주입 (scheduler에서 import 실행 시에도 적용)
+    _session = config.get("krx_session", {})
+    _inject_krx_session(
+        jsessionid=_session.get("jsessionid", ""),
+        extra_cookies=_session.get("extra_cookies", ""),
+    )
 
     if end_date is None:
         end_date = datetime.today().strftime("%Y%m%d")
@@ -213,13 +223,7 @@ def collect_all(
 
 
 if __name__ == "__main__":
-    # KRX 로그인 세션 주입 (2025-12-27 이후 필수)
-    # config/config.yaml의 krx_session 항목에 JSESSIONID 값을 입력할 것
-    _cfg = load_config()
-    _session = _cfg.get("krx_session", {})
-    _inject_krx_session(
-        jsessionid=_session.get("jsessionid", ""),
-        extra_cookies=_session.get("extra_cookies", ""),
-    )
+    # KRX 세션 주입은 collect_all() 내부에서 처리됩니다.
+    # config/config.yaml의 krx_session.jsessionid 값을 최신으로 유지하세요.
     date_arg = sys.argv[1] if len(sys.argv) > 1 else None
     collect_all(end_date=date_arg)
