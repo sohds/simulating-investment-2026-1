@@ -146,6 +146,7 @@ def collect_avg_trading_value(end_date: str, days: int = 60) -> pd.Series:
 def collect_all(
     end_date: Optional[str] = None,
     config_path: str = "config/config.yaml",
+    force: bool = False,
 ) -> str:
     """
     메인 수집 함수. end_date 기준 수급 데이터를 수집하여
@@ -157,6 +158,7 @@ def collect_all(
     Args:
         end_date: 기준일 "YYYYMMDD". None이면 오늘.
         config_path: config.yaml 경로
+        force: True이면 기존 CSV가 있어도 재수집. 기본값 False(스킵).
 
     Returns:
         저장된 파일 경로
@@ -172,6 +174,12 @@ def collect_all(
 
     if end_date is None:
         end_date = datetime.today().strftime("%Y%m%d")
+
+    save_dir = "data/supply_demand"
+    save_path = os.path.join(save_dir, f"{end_date}.csv")
+    if not force and os.path.isfile(save_path):
+        print(f"[스킵] {save_path} 이미 존재합니다. (재수집하려면 force=True)")
+        return save_path
 
     short_period = config["selection"]["short_period"]  # 10
     long_period = config["selection"]["long_period"]    # 20
@@ -234,9 +242,7 @@ def collect_all(
     if "종목명" in df.columns:
         df["종목명"] = df["종목명"].fillna("")
 
-    save_dir = "data/supply_demand"
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{end_date}.csv")
     df.to_csv(save_path, encoding="utf-8-sig")
 
     print(f"[완료] {save_path} 저장 완료 ({len(df)}개 종목)")

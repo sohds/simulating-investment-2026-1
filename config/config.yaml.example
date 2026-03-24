@@ -1,23 +1,31 @@
 account:
   number: "YOUR_MOCK_ACCOUNT_NUMBER"   # 모의투자 전용 계좌번호 입력
   mock: true                           # 반드시 true 유지 (실계좌 연동 금지)
+  appkey: "YOUR_APP_KEY_HERE"          # openapi.kiwoom.com → 상시모의투자 앱키
+  secretkey: "YOUR_SECRET_KEY_HERE"    # 시크릿키
 
 filter:
   min_market_cap: 500000000000         # 시가총액 최소 5,000억 원
   min_avg_volume: 10000000000          # 60일 평균 거래대금 최소 100억 원
-  float_ratio: 0.5                     # 유동비율
+  float_ratio: 0.5                     # 유동비율 (수급 강도 산출에 사용)
 
 selection:
   short_period: 10                     # 단기 수급 강도 기간 (일)
   long_period: 20                      # 장기 수급 강도 기간 (일)
-  top_n: 10                            # 각 기간별 상위 종목 수
+  universe_top_n: 100                  # 유니버스 구성 시 외국인·기관 각 상위 종목 수
+  top_n: 10                            # 각 기간별 상위 종목 수 (단기·장기 선정)
   max_stocks: 16                       # 최대 편입 종목 수
 
 rebalancing:
-  interval_weeks: 2                    # 리밸런싱 주기 (2주)
-  order_type: "시장가"                  # 모의투자: 지정가 / 시장가만 가능
+  groups_file: "config/rebalancing_groups.yaml"   # 2주 리밸런싱 그룹 기간표
+  year: 2026                           # 사용할 그룹 기간표 연도
+  order_type: "시장가"                  # 주문 유형 (모의투자: 시장가만 가능)
 
 sell_rules:
-  take_profit_ratio: 0.15              # 목표 수익률 +15% → 50% 분할 매도
+  take_profit_ratio: 0.15              # 목표 수익률 +15% → 보유 수량 50% 분할 매도
   stop_loss_ratio: -0.08               # 손절 -8% → 즉시 전량 매도
-  sell_partial_ratio: 0.5              # 목표 수익률 도달 시 매도 비율
+  sell_partial_ratio: 0.5              # 목표 수익률 도달 시 매도 비율 (50%)
+
+krx_session:
+  jsessionid: "YOUR_JSESSIONID_HERE"   # data.krx.co.kr 로그인 후 복사
+  extra_cookies: ""                    # __smVisitorID 등 추가 쿠키 (선택)

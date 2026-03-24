@@ -161,6 +161,9 @@ def run(
     if df.empty:
         return pd.DataFrame()
 
+    if len(df) < 5:
+        print(f"  [경고] 유니버스 종목 수가 {len(df)}개로 매우 적습니다. 선정 결과를 주의하세요.")
+
     df = apply_filters(df, config)
     print(f"  필터 후 (시총·거래대금): {len(df)}개")
 
