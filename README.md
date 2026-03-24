@@ -10,7 +10,8 @@
 
 - 투자 전략: 외국인·기관 순매수 수급 강도 지표 기반 종목 선정 + 2주 단위 자동 리밸런싱
 - 모의투자 기간: **2026.03.04 ~ 2026.06.16** (수업 시작일 ~ 종강 전일)
-- 투자 도구: 키움증권 REST API 모의투자 서버 (`https://mockapi.kiwoom.com`)
+- 투자 도구: 키움증권 REST API **상시모의투자** 서버 (`https://mockapi.kiwoom.com`)
+- 운용 방식: 상시모의투자 계좌(1천만원)로 자동 주문 실행 → `logs/order_report_YYYYMMDD.md` 생성 → 대학그룹모의투자 계좌에 수동 미러링
 - 리밸런싱 방식: 사전 정의된 그룹 기간표에 따라 GN 기간 종목 선정 → GN+1 기간 투자 실행
 
 ---
@@ -102,12 +103,17 @@ simul-stock/
 │   ├── collector.py                # pykrx 수급 데이터 수집
 │   ├── selector.py                 # 수급 강도 지표 산출 및 종목 선정
 │   ├── schedule_groups.py          # 리밸런싱 그룹 기간표 관리
-│   ├── kiwoom_api.py               # 키움 OpenAPI 연결 및 주문 실행 (Windows 전용)
+│   ├── kiwoom_api.py               # 키움 REST API 연결 및 주문 실행
 │   ├── rebalancer.py               # 리밸런싱 로직 (편입·편출 계산 및 주문)
 │   └── scheduler.py                # 그룹 기간표 기반 자동 실행 스케줄러
 │
+├── data/
+│   ├── supply_demand/              # pykrx 수집 수급 데이터 저장 (YYYYMMDD.csv)
+│   └── kiwoom_keys/                # API 앱키·시크릿키 파일 (.gitignore 제외)
+│
 └── logs/
     ├── rebalance_history.csv       # 리밸런싱 이력 기록
+    ├── order_report_YYYYMMDD.md    # 리밸런싱 주문서 (대학그룹모의투자 미러링용)
     ├── last_rebalancing_group.txt  # 마지막 실행 그룹 추적
     └── scheduler.log               # 스케줄러 실행 로그
 ```
@@ -224,7 +230,10 @@ python src/scheduler.py --now
 [rebalancer] 보유 종목 비교 → 편출 매도 → 조건 매도 → 편입 매수
         │
         ▼
-[logger] logs/rebalance_history.csv 이력 저장 (그룹명 포함)
+[logger] logs/rebalance_history.csv 이력 저장 + logs/order_report_YYYYMMDD.md 주문서 생성
+        │
+        ▼
+[수동] 주문서를 참고해 대학그룹모의투자 계좌에 동일 주문 입력
 ```
 
 ---
@@ -241,10 +250,12 @@ python src/scheduler.py --now
 
 ## 주의 사항
 
-- REST API 앱키는 [https://openapi.kiwoom.com](https://openapi.kiwoom.com) 에서 발급받아야 합니다.
+- REST API는 **상시모의투자 전용 앱키**가 필요합니다. 실전투자 앱키로는 `mockapi.kiwoom.com` 접속이 차단됩니다.
+  - 상시모의투자 신청: 키움증권 홈페이지 → 모의/실전투자 → 상시모의투자 → 신청
+  - 앱키 발급: [https://openapi.kiwoom.com](https://openapi.kiwoom.com) → **모의투자** 선택 후 발급
 - 앱키 발급 시 **IP 화이트리스트** 등록이 필요합니다 (호출 IP를 포털에서 등록).
-- 토큰 유효기간은 **24시간**입니다. 코드에서 자동 재발급이 되지만 장애 시 수동 확인 필요.
-- 모의투자 서버에서는 **시장가 주문만** 사용합니다 (config.yaml `order_type: "시장가"`).
+- 토큰 유효기간은 **24시간**입니다. 코드에서 자동 재발급되지만 장애 시 수동 확인 필요.
+- 모의투자 서버에서는 **시장가 주문만** 사용합니다.
 - 과도한 API 호출은 서버 부하로 차단될 수 있습니다 (collector에 딜레이 적용됨).
 - **kiwoom_api.py의 API 엔드포인트 경로는 앱키 발급 후 공식 문서에서 확인·수정 필요합니다.**
   - 참고: [https://openapi.kiwoom.com/guide/apiguide](https://openapi.kiwoom.com/guide/apiguide)
