@@ -123,12 +123,13 @@ def execute_rebalance(
     for code in exit_codes:
         row = holdings[holdings["종목코드"] == code].iloc[0]
         qty = int(row["보유수량"])
+        price = int(row["현재가"])
         order_no = api.sell(code, qty)
         status = "성공" if order_no else "실패"
-        print(f"  {row['종목명']}({code}) {qty}주 [{status}]")
+        print(f"  {row['종목명']}({code}) {qty}주 @ {price:,}원 [{status}]")
         exit_log.append({
             "종목코드": code, "종목명": row["종목명"],
-            "수량": qty, "구분": "편출매도", "주문번호": order_no,
+            "수량": qty, "현재가": price, "구분": "편출매도", "주문번호": order_no,
         })
 
     # ── Step 2. 손절 / 목표수익 조건 체크 ────────────────────────────
@@ -138,12 +139,14 @@ def execute_rebalance(
     print(f"\n[조건 매도] {len(condition_orders)}건")
 
     for code, name, qty, reason in condition_orders:
+        row = holdings[holdings["종목코드"] == code].iloc[0]
+        price = int(row["현재가"])
         order_no = api.sell(code, qty)
         status = "성공" if order_no else "실패"
-        print(f"  {name}({code}) {qty}주 — {reason} [{status}]")
+        print(f"  {name}({code}) {qty}주 @ {price:,}원 — {reason} [{status}]")
         condition_log.append({
             "종목코드": code, "종목명": name,
-            "수량": qty, "구분": reason, "주문번호": order_no,
+            "수량": qty, "현재가": price, "구분": reason, "주문번호": order_no,
         })
 
     # ── Step 3. 편입 매수 ────────────────────────────────────────────
@@ -190,7 +193,7 @@ def execute_rebalance(
         print(f"  {name}({code}) {qty}주 @ {price:,}원 [{status}]")
         entry_log.append({
             "종목코드": code, "종목명": name,
-            "수량": qty, "구분": "편입매수", "주문번호": order_no,
+            "수량": qty, "현재가": price, "구분": "편입매수", "주문번호": order_no,
         })
 
     return {
@@ -233,6 +236,69 @@ def save_log(result: dict, date: str, group_name: str = "") -> None:
         writer.writerows(rows)
 
     print(f"[이력 저장] {log_path} ({len(rows)}건 추가)")
+
+
+def save_order_report(result: dict, date: str, group_name: str = "") -> None:
+    """리밸런싱 주문 내역을 logs/order_report_YYYYMMDD.md 로 저장.
+
+    대학그룹모의투자 계좌에 수동 미러링할 때 참고용.
+    종목코드·종목명·수량·주문가·주문금액을 표 형태로 정리합니다.
+    """
+    os.makedirs("logs", exist_ok=True)
+    report_path = f"logs/order_report_{date}.md"
+
+    lines = []
+    lines.append(f"# 리밸런싱 주문서")
+    lines.append(f"")
+    lines.append(f"- **실행일**: {date[:4]}-{date[4:6]}-{date[6:]}")
+    if group_name:
+        lines.append(f"- **투자 그룹**: {group_name}")
+    lines.append(f"- **총 운용 금액**: {result['총투자금액']:,}원")
+    lines.append(f"")
+
+    # ── 매도 주문 ────────────────────────────────────────────────────
+    sell_items = result.get("편출", []) + result.get("조건매도", [])
+    lines.append(f"## 매도 주문 ({len(sell_items)}건)")
+    lines.append(f"")
+    if sell_items:
+        lines.append("| 종목코드 | 종목명 | 수량 | 주문가 | 주문금액 | 구분 |")
+        lines.append("|---|---|---:|---:|---:|---|")
+        for item in sell_items:
+            price = item.get("현재가", 0)
+            amount = price * item["수량"]
+            lines.append(
+                f"| {item['종목코드']} | {item['종목명']} | {item['수량']:,} | "
+                f"{price:,}원 | {amount:,}원 | {item['구분']} |"
+            )
+    else:
+        lines.append("_매도 주문 없음_")
+    lines.append(f"")
+
+    # ── 매수 주문 ────────────────────────────────────────────────────
+    buy_items = result.get("편입", [])
+    lines.append(f"## 매수 주문 ({len(buy_items)}건)")
+    lines.append(f"")
+    if buy_items:
+        lines.append("| 종목코드 | 종목명 | 수량 | 주문가 | 주문금액 |")
+        lines.append("|---|---|---:|---:|---:|")
+        for item in buy_items:
+            price = item.get("현재가", 0)
+            amount = price * item["수량"]
+            lines.append(
+                f"| {item['종목코드']} | {item['종목명']} | {item['수량']:,} | "
+                f"{price:,}원 | {amount:,}원 |"
+            )
+        total_buy = sum(item.get("현재가", 0) * item["수량"] for item in buy_items)
+        lines.append(f"| | **합계** | | | **{total_buy:,}원** |")
+    else:
+        lines.append("_매수 주문 없음_")
+    lines.append(f"")
+    lines.append(f"> 주문가는 주문 접수 시점의 시장가 기준입니다. 실제 체결가와 다를 수 있습니다.")
+
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    print(f"[주문서 저장] {report_path}")
 
 
 def run(
@@ -284,9 +350,10 @@ def run(
     print("\n[Step 3] 주문 실행")
     result = execute_rebalance(api, selected, config)
 
-    # Step 4. 이력 저장
-    print("\n[Step 4] 이력 저장")
+    # Step 4. 이력 저장 및 주문서 생성
+    print("\n[Step 4] 이력 저장 및 주문서 생성")
     save_log(result, today, group_name)
+    save_order_report(result, today, group_name)
 
     n_exit  = len(result["편출"])
     n_cond  = len(result["조건매도"])

@@ -214,6 +214,7 @@ CLAUDE.md
 TO-DOs.md
 config/config.yaml              # 계좌번호 등 민감 정보 포함
 data/
+data/kiwoom_keys/               # API 키 파일 (명시적 제외)
 logs/
 !data/supply_demand/.gitkeep
 !logs/.gitkeep
