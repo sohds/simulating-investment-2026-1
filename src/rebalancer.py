@@ -24,6 +24,7 @@ config.yaml에 appkey / secretkey 입력 필요.
 import csv
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -73,7 +74,9 @@ def check_exit_conditions(holdings: pd.DataFrame, config: dict) -> list:
 
     orders = []
     for _, row in holdings.iterrows():
-        rate = row["수익률"] / 100  # pykiwoom은 % 단위로 반환
+        # TODO: REST API 응답의 수익률 단위 확인 필요.
+        #   % 단위(예: 8.5)로 오면 /100 유지, 소수 비율(예: 0.085)로 오면 /100 제거.
+        rate = row["수익률"] / 100
 
         if rate <= stop_loss:
             orders.append((
@@ -146,6 +149,11 @@ def execute_rebalance(
     # ── Step 3. 편입 매수 ────────────────────────────────────────────
     entry_codes = selected_codes - holding_codes  # 미보유 종목만 매수
     print(f"\n[편입 매수] {len(entry_codes)}개 종목")
+
+    # 매도 주문 접수 후 체결·예수금 반영까지 시차가 있으므로 대기
+    if exit_codes or condition_orders:
+        print("  [대기] 매도 체결 반영 대기 중 (3초)...")
+        time.sleep(3)
 
     deposit = api.get_deposit()  # 매도 체결 후 예수금 재조회
     holdings_value = 0
