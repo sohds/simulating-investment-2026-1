@@ -1,6 +1,5 @@
 pykrx
-pykiwoom
-PyQt5
+requests
 pandas
 numpy
 pyyaml

@@ -17,7 +17,8 @@ rebalancer.py
     - 매도 후 남은 예수금 기준 균등 비중 배분
     - 이미 보유 중인 선정 종목은 스킵 (리밸런싱 주기 내 재매수 없음)
 
-⚠️  Windows 전용 (kiwoom_api 의존)
+키움 REST API 사용 (Mac/Linux/Windows 모두 실행 가능).
+config.yaml에 appkey / secretkey 입력 필요.
 """
 
 import csv
@@ -231,7 +232,7 @@ def run(
     group_name: str = "",
     config_path: str = "config/config.yaml",
 ) -> None:
-    """메인 리밸런싱 실행 함수 (Windows 전용).
+    """메인 리밸런싱 실행 함수.
 
     Steps:
         1. 종목 선정 (시그널 그룹 마감일 기준 데이터 사용)
@@ -244,8 +245,6 @@ def run(
         group_name: 현재 투자 그룹 이름 (예: "G5"). 이력 기록용.
         config_path: config.yaml 경로
     """
-    from PyQt5.QtWidgets import QApplication
-
     config = load_config(config_path)
 
     if signal_date is None:
@@ -268,9 +267,8 @@ def run(
         print("[중단] 선정된 종목이 없습니다.")
         return
 
-    # Step 2. 키움 API 연결
-    print("\n[Step 2] 키움 API 연결")
-    app = QApplication(sys.argv)
+    # Step 2. 키움 REST API 연결 (토큰 발급)
+    print("\n[Step 2] 키움 REST API 연결")
     api = KiwoomAPI(config_path=config_path)
     api.connect()
 

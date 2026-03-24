@@ -1,6 +1,6 @@
 # Kiwoom Auto Rebalancer
 
-키움 OpenAPI 기반 **외국인·기관 순매수 수급 강도 지표** 활용 2주 자동 리밸런싱 모의투자 시스템
+키움 **REST API** 기반 **외국인·기관 순매수 수급 강도 지표** 활용 2주 자동 리밸런싱 모의투자 시스템
 
 ---
 
@@ -10,7 +10,7 @@
 
 - 투자 전략: 외국인·기관 순매수 수급 강도 지표 기반 종목 선정 + 2주 단위 자동 리밸런싱
 - 모의투자 기간: **2026.03.04 ~ 2026.06.16** (수업 시작일 ~ 종강 전일)
-- 투자 도구: 키움증권 OpenAPI 모의투자 서버
+- 투자 도구: 키움증권 REST API 모의투자 서버 (`https://mockapi.kiwoom.com`)
 - 리밸런싱 방식: 사전 정의된 그룹 기간표에 따라 GN 기간 종목 선정 → GN+1 기간 투자 실행
 
 ---
@@ -118,13 +118,12 @@ simul-stock/
 
 ### 요구 사항
 
-- **Windows OS 필수** (키움 OpenAPI는 Windows 전용 ActiveX 기반)
+- **Mac / Linux / Windows 모두 실행 가능** (REST API 기반, ActiveX 불필요)
 - Python 3.9 이상
-- 키움증권 계좌 및 OpenAPI+ 사용 신청
+- 키움증권 계좌 및 REST API 사용 신청
+  - 신청: [https://openapi.kiwoom.com](https://openapi.kiwoom.com) → 앱키 발급
 - 모의투자 서버 별도 신청 필요
-
-> 키움 OpenAPI 신청: 키움증권 홈페이지 → 트레이딩채널 → Open API → 서비스 사용 등록
-> 모의투자 신청: 키움증권 홈페이지 → 모의/실전투자 → 상시모의투자 → 신청
+  - 신청: 키움증권 홈페이지 → 모의/실전투자 → 상시모의투자 → 신청
 
 ### 설치
 
@@ -134,39 +133,33 @@ pip install -r requirements.txt
 
 ### 설정 파일 준비
 
-```bash
-# 템플릿을 복사해 config.yaml 생성
-cp config/config.yaml.example config/config.yaml
-```
-
-`config/config.yaml` 을 열어 계좌번호와 연도를 설정합니다.
+`config/config.yaml`을 열어 계좌번호·앱키·시크릿키를 입력합니다.
 
 ```yaml
 account:
-  number: "1234567890"   # ← 모의투자 계좌번호로 변경
-  mock: true             # 반드시 true 유지
+  number: "1234567890"              # ← 모의투자 계좌번호로 변경
+  mock: true                        # 반드시 true 유지
+  appkey: "YOUR_APP_KEY_HERE"       # ← openapi.kiwoom.com에서 발급한 앱키
+  secretkey: "YOUR_SECRET_KEY_HERE" # ← 시크릿키
 
 rebalancing:
   groups_file: "config/rebalancing_groups.yaml"
   year: 2026             # 사용할 그룹 기간표 연도
 ```
 
-> `config/config.yaml` 은 계좌번호 보호를 위해 `.gitignore`에 등록되어 있습니다.
+> `config/config.yaml` 은 계좌번호·API 키 보호를 위해 `.gitignore`에 등록되어 있습니다.
 
 ---
 
 ## 실행 방법
 
-> **참고**: `collector.py` · `selector.py` · `schedule_groups.py`는 pykrx만 사용하므로 **Mac에서도 실행 가능**합니다.
-> `kiwoom_api.py` · `rebalancer.py` · `scheduler.py`는 **Windows 전용**입니다.
+> **모든 모듈이 Mac / Linux / Windows에서 실행 가능합니다.**
+> 단, `kiwoom_api.py` 관련 기능은 `config.yaml`에 REST API 앱키 입력 후 사용 가능합니다.
 
 ### 그룹 기간표 확인
 
 ```bash
-# 현재 설정된 연도의 그룹 기간표 출력
 python src/schedule_groups.py
-
-# 스케줄러에서 기간표 확인
 python src/scheduler.py --schedule
 ```
 
@@ -183,28 +176,25 @@ python src/collector.py 20260318
 ### Step 2. 종목 선정 확인
 
 ```bash
-# 오늘 기준 선정 결과 출력
 python src/selector.py
-
-# 시그널 날짜 기준
 python src/selector.py 20260318
 ```
 
-### Step 3. 키움 API 연결 테스트 (Windows)
+### Step 3. REST API 연결 테스트
 
 ```bash
+# config.yaml에 appkey / secretkey 입력 후 실행
 python src/kiwoom_api.py
-# 팝업 로그인 창에서 '모의투자 서버' 체크 후 로그인
+# → 토큰 발급 후 예수금·보유 종목 출력
 ```
 
-### Step 4. 리밸런싱 수동 실행 (Windows)
+### Step 4. 리밸런싱 수동 실행
 
 ```bash
-# 시그널 날짜 기준 리밸런싱 실행
 python src/rebalancer.py 20260318
 ```
 
-### Step 5. 자동 스케줄러 실행 (Windows)
+### Step 5. 자동 스케줄러 실행
 
 ```bash
 # 스케줄러 시작 (매 영업일 09:30 자동 체크)
@@ -213,8 +203,6 @@ python src/scheduler.py
 # 현재 그룹 즉시 실행
 python src/scheduler.py --now
 ```
-
-스케줄러는 그룹 기간표를 참조해 새로운 투자 그룹이 시작되면 자동으로 전체 파이프라인을 실행합니다.
 
 ---
 
@@ -253,10 +241,13 @@ python src/scheduler.py --now
 
 ## 주의 사항
 
-- 키움 OpenAPI는 **Windows 전용**입니다. Mac / Linux 환경에서는 동작하지 않습니다.
-- 모의투자 서버에서는 **지정가·시장가 주문만** 지원됩니다.
-- OpenAPI 중복 로그인이 불가하므로 영웅문 등 다른 HTS와 동시 실행 시 주의가 필요합니다.
-- 과도한 데이터 조회는 서버 부하로 접속이 차단될 수 있습니다 (collector에 딜레이 적용됨).
+- REST API 앱키는 [https://openapi.kiwoom.com](https://openapi.kiwoom.com) 에서 발급받아야 합니다.
+- 앱키 발급 시 **IP 화이트리스트** 등록이 필요합니다 (호출 IP를 포털에서 등록).
+- 토큰 유효기간은 **24시간**입니다. 코드에서 자동 재발급이 되지만 장애 시 수동 확인 필요.
+- 모의투자 서버에서는 **시장가 주문만** 사용합니다 (config.yaml `order_type: "시장가"`).
+- 과도한 API 호출은 서버 부하로 차단될 수 있습니다 (collector에 딜레이 적용됨).
+- **kiwoom_api.py의 API 엔드포인트 경로는 앱키 발급 후 공식 문서에서 확인·수정 필요합니다.**
+  - 참고: [https://openapi.kiwoom.com/guide/apiguide](https://openapi.kiwoom.com/guide/apiguide)
 - 2026년 그룹 기간표의 공휴일은 추정치입니다. 실제 시장 휴장일 확정 시 `config/rebalancing_groups.yaml`을 검증하세요.
 
 ---
@@ -267,8 +258,7 @@ python src/scheduler.py --now
 |---|---|---|
 | 수급 데이터 수집 | `pykrx` | 1.2.4 |
 | 수급 데이터 수집 | `finance-datareader` | 0.9.110 |
-| OpenAPI 연동 | `pykiwoom` | Windows 전용 |
-| OpenAPI 연동 | `PyQt5` | Windows 전용 |
+| REST API 연동 | `requests` | 2.x |
 | 데이터 처리 | `pandas` | 2.3.3 |
 | 데이터 처리 | `numpy` | 1.26.4 |
 | 스케줄링 | `schedule` | 1.2.2 |
@@ -276,16 +266,13 @@ python src/scheduler.py --now
 
 ### Python 버전
 
-| 환경 | 버전 |
-|---|---|
-| Mac (개발·테스트) | Python 3.13.9 |
-| Windows (운영) | Python 3.9 이상 권장 |
+Python 3.9 이상 (Mac / Linux / Windows 모두 동일 환경 사용 가능)
 
 ---
 
 ## 참고
 
 - [Ko-ActiveETF (그룹 기간표 참조)](https://github.com/sohds/Ko-ActiveETF)
-- [키움 OpenAPI+ 공식 다운로드](https://www.kiwoom.com/h/customer/download/VOpenApiInfoView)
-- [pykiwoom 문서](https://wikidocs.net/book/1173)
+- [키움 REST API 공식 포털](https://openapi.kiwoom.com)
+- [키움 REST API 가이드](https://openapi.kiwoom.com/guide/apiguide)
 - [pykrx 문서](https://github.com/sharebook-kr/pykrx)
