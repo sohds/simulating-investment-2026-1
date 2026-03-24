@@ -83,7 +83,9 @@ class KiwoomAPI:
             or (self._token_expires - datetime.now()).total_seconds() < 300
         ):
             self._fetch_token()
-        return self._token  # type: ignore[return-value]
+        # _fetch_token이 성공했으면 반드시 _token이 설정됨 (실패 시 raise_for_status로 예외)
+        assert self._token is not None
+        return self._token
 
     @property
     def _headers(self) -> dict:
