@@ -165,6 +165,12 @@ def collect_all(
     short_period = config["selection"]["short_period"]  # 10
     long_period = config["selection"]["long_period"]    # 20
 
+    if short_period > long_period:
+        raise ValueError(
+            f"short_period({short_period}) > long_period({long_period}): "
+            "config.yaml 설정을 확인하세요."
+        )
+
     # 기간별 시작일 계산 (실제 영업일 기준)
     trading_dates = get_recent_trading_dates(end_date, long_period)
     short_start = trading_dates[-short_period]
