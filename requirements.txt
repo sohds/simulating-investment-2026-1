@@ -5,3 +5,5 @@ numpy
 pyyaml
 schedule
 finance-datareader
+dash
+dash-bootstrap-components
