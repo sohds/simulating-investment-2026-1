@@ -105,7 +105,9 @@ simul-stock/
 │   ├── schedule_groups.py          # 리밸런싱 그룹 기간표 관리
 │   ├── kiwoom_api.py               # 키움 REST API 연결 및 주문 실행
 │   ├── rebalancer.py               # 리밸런싱 로직 (편입·편출 계산 및 주문)
-│   └── scheduler.py                # 그룹 기간표 기반 자동 실행 스케줄러
+│   ├── scheduler.py                # 그룹 기간표 기반 자동 실행 스케줄러
+│   ├── dashboard.py                # Dash 웹 대시보드 (포트폴리오·주문·수집 통합 UI)
+│   └── README.md                   # 각 모듈 설명
 │
 ├── data/
 │   ├── supply_demand/              # pykrx 수집 수급 데이터 저장 (YYYYMMDD.csv)
@@ -210,6 +212,25 @@ python src/scheduler.py
 python src/scheduler.py --now
 ```
 
+### Step 6. 대시보드 실행 (선택)
+
+터미널 없이 브라우저에서 포트폴리오 확인·주문 실행·수급 수집을 한 화면에서 처리할 수 있습니다.
+
+```bash
+python src/dashboard.py
+# → http://localhost:8050 접속
+```
+
+| 탭 | 기능 |
+|---|---|
+| 포트폴리오 | 보유 종목 수익률 차트, 예수금·총평가금액·손익 카드 |
+| 리밸런싱 | 현재 그룹·시그널 날짜 표시, 선정 종목 확인, 주문 실행 버튼 + 실시간 로그 |
+| 수집·선정 | KRX 세션 쿠키 갱신 및 저장, 수집/선정/수집+선정 버튼 + 실시간 로그 |
+| 설정 | 계좌 정보 및 현재 KRX 세션 상태 확인 |
+
+> Streamlit 대신 Dash를 사용한 이유: Streamlit은 이벤트마다 Python 파일 전체를 재실행하는 반면,
+> Dash는 콜백 단위로만 실행되어 키움 API 호출 횟수를 최소화하고 반응 속도가 빠릅니다.
+
 ---
 
 ## 리밸런싱 흐름
@@ -274,6 +295,8 @@ python src/scheduler.py --now
 | 데이터 처리 | `numpy` | 1.26.4 |
 | 스케줄링 | `schedule` | 1.2.2 |
 | 설정 관리 | `pyyaml` | 6.0.3 |
+| 대시보드 | `dash` | 3.x |
+| 대시보드 UI | `dash-bootstrap-components` | 2.x |
 
 ### Python 버전
 
