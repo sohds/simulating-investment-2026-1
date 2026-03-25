@@ -9,6 +9,7 @@ kiwoom_api.py
     python src/kiwoom_api.py    # 연결 테스트 (예수금·보유 종목 출력)
 """
 
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -164,8 +165,10 @@ class KiwoomAPI:
 
         rows = []
         for item in items:
+            raw_cd = item.get("stk_cd", "")
+            stk_cd = raw_cd.lstrip("AQ") if raw_cd else ""
             rows.append({
-                "종목코드": item.get("stk_cd", ""),
+                "종목코드": stk_cd,
                 "종목명":   item.get("stk_nm", ""),
                 "보유수량": int(str(item.get("rmnd_qty", 0)).replace(",", "")),
                 "매입단가": int(str(item.get("avg_prc", 0)).replace(",", "")),
@@ -187,6 +190,7 @@ class KiwoomAPI:
             code: 종목 코드 (예: "005930")
         """
         url = f"{self.base_url}/api/dostk/stkinfo"
+        time.sleep(1)
         resp = requests.post(
             url,
             headers=self._headers("ka10001"),
