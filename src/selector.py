@@ -186,5 +186,15 @@ def run(
 
 
 if __name__ == "__main__":
-    date_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    run(date=date_arg)
+    import argparse
+    parser = argparse.ArgumentParser(description="수급 강도 기반 종목 선정")
+    parser.add_argument("date", nargs="?", default=None, help="기준일 YYYYMMDD (기본: 오늘)")
+    parser.add_argument("--no-report", action="store_true", help="리포트 생성 비활성화")
+    args = parser.parse_args()
+
+    selected = run(date=args.date)
+
+    if not args.no_report and not selected.empty:
+        import reporter
+        signal_date = args.date or datetime.today().strftime("%Y%m%d")
+        reporter.run(selected=selected, signal_date=signal_date)
