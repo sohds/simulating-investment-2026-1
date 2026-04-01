@@ -106,18 +106,16 @@ simul-stock/
 │   ├── kiwoom_api.py               # 키움 REST API 연결 및 주문 실행
 │   ├── rebalancer.py               # 리밸런싱 로직 (편입·편출 계산 및 주문)
 │   ├── scheduler.py                # 그룹 기간표 기반 자동 실행 스케줄러
-│   ├── dashboard.py                # Dash 웹 대시보드 (포트폴리오·주문·수집 통합 UI)
+│   ├── reporter.py                 # 포트폴리오 손익·시장 흐름·GPT 분석 리포트 생성
+│   ├── dashboard.py                # Dash 웹 대시보드 (포트폴리오·주문·수집·리포트 통합 UI)
 │   └── README.md                   # 각 모듈 설명
-│
-├── data/
-│   ├── supply_demand/              # pykrx 수집 수급 데이터 저장 (YYYYMMDD.csv)
-│   └── kiwoom_keys/                # API 앱키·시크릿키 파일 (.gitignore 제외)
 │
 └── logs/
     ├── rebalance_history.csv       # 리밸런싱 이력 기록
     ├── order_report_YYYYMMDD.md    # 리밸런싱 주문서 (대학그룹모의투자 미러링용)
     ├── last_rebalancing_group.txt  # 마지막 실행 그룹 추적
-    └── scheduler.log               # 스케줄러 실행 로그
+    ├── scheduler.log               # 스케줄러 실행 로그
+    └── final-report/               # 리밸런싱 리포트 (report_YYYYMMDD.md)
 ```
 
 ---
@@ -181,11 +179,26 @@ python src/collector.py
 python src/collector.py 20260318
 ```
 
-### Step 2. 종목 선정 확인
+### Step 2. 종목 선정 및 리포트 생성
 
 ```bash
+# 오늘 기준 종목 선정 + 리밸런싱 리포트 자동 생성
 python src/selector.py
-python src/selector.py 20260318
+
+# 시그널 그룹 마감일 기준 (예: G6 마감일)
+python src/selector.py 20260401
+
+# 리포트 없이 종목 선정만
+python src/selector.py --no-report 20260401
+```
+
+> 리포트는 `logs/final-report/report_YYYYMMDD.md`에 저장됩니다. `config.yaml`의 `report.openai_api_key` 입력 필요.
+
+### Step 2-1. 리포트 단독 생성 (선택)
+
+```bash
+# 특정 날짜 기준으로 리포트만 별도 생성
+python src/reporter.py 20260401
 ```
 
 ### Step 3. REST API 연결 테스트
@@ -226,6 +239,7 @@ python src/dashboard.py
 | 포트폴리오 | 보유 종목 수익률 차트, 예수금·총평가금액·손익 카드 |
 | 리밸런싱 | 현재 그룹·시그널 날짜 표시, 선정 종목 확인, 주문 실행 버튼 + 실시간 로그 |
 | 수집·선정 | KRX 세션 쿠키 갱신 및 저장, 수집/선정/수집+선정 버튼 + 실시간 로그 |
+| 리포트 | 최신 `logs/final-report/report_*.md` 마크다운 렌더링, 생성 날짜 배지 표시 |
 | 설정 | 계좌 정보 및 현재 KRX 세션 상태 확인 |
 
 > Streamlit 대신 Dash를 사용한 이유: Streamlit은 이벤트마다 Python 파일 전체를 재실행하는 반면,
@@ -297,6 +311,7 @@ python src/dashboard.py
 | 설정 관리 | `pyyaml` | 6.0.3 |
 | 대시보드 | `dash` | 3.x |
 | 대시보드 UI | `dash-bootstrap-components` | 2.x |
+| GPT 리포트 | `openai` | 1.x |
 
 ### Python 버전
 

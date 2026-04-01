@@ -37,11 +37,13 @@ python src/collector.py            # 오늘 날짜 기준 수집
 4. 단기(10일) 상위 10 + 장기(20일) 상위 10 → 최대 16종목
 
 ```bash
-python src/selector.py 20260401
+python src/selector.py 20260401           # 종목선정 + 리포트 자동 생성
+python src/selector.py --no-report 20260401  # 리포트 없이 종목선정만
 ```
 
 - **출력**: `data/supply_demand/selected_YYYYMMDD.csv`
 - **주요 함수**: `run(date, config_path)`
+- **플래그**: `--no-report` — 리포트 생성 비활성화 (기본값: 리포트 생성)
 
 ---
 
@@ -77,6 +79,32 @@ python src/kiwoom_api.py   # 연결 테스트 (예수금·보유 종목 출력)
 
 > **주의**: `get_holdings()` 응답의 `stk_cd` 필드는 `A017960` 형태로 마켓 접두사가 붙어 반환된다.
 > 내부에서 `lstrip("AQ")`으로 제거하므로 외부에서는 순수 숫자 코드로 사용한다.
+
+---
+
+## reporter.py
+
+**리밸런싱 리포트 자동 생성 모듈.**
+
+종목선정 시그널 날에 포트폴리오 손익·시장 흐름·수급 강도 변화를 수집하고
+GPT-5.4-mini로 서술형 분석을 생성해 마크다운 파일로 저장한다.
+
+수집 데이터:
+- 포트폴리오 손익: `KiwoomAPI.get_holdings()` (API 실패 시 오류 메시지로 대체)
+- 시장 지수: pykrx KOSPI/KOSDAQ 지수 (KRX 서버 접근 불가 시 skipped)
+- 수급 강도 변화: 직전 그룹 vs 현재 그룹 CSV 비교
+- GPT 분석: OpenAI API (`config.yaml`의 `report.openai_api_key` 필요)
+
+```bash
+python src/reporter.py 20260401   # 특정 날짜 기준 리포트 생성
+python src/reporter.py            # 오늘 날짜 기준
+```
+
+- **출력**: `logs/final-report/report_YYYYMMDD.md`
+- **주요 함수**: `run(selected, signal_date, group_name, config_path)`
+- **설정**: `config.yaml`의 `report.openai_api_key`, `report.model`, `report.enabled`
+
+> `selector.py` 실행 시 자동으로 호출됨. `--no-report` 플래그로 비활성화 가능.
 
 ---
 
@@ -130,6 +158,7 @@ python src/dashboard.py   # 실행 후 http://localhost:8050 접속
 | 포트폴리오 | 보유 종목별 수익률 바 차트, 예수금·총평가금액·손익 카드 |
 | 리밸런싱 | 현재 그룹·시그널 날짜 표시, 선정 종목 테이블, 주문 실행 버튼 + 실시간 로그 |
 | 수집·선정 | KRX 세션 쿠키 입력 및 `config.yaml` 저장, 수집/선정/수집+선정 버튼 + 실시간 로그 |
+| 리포트 | 최신 `logs/final-report/report_*.md` 마크다운 렌더링, 생성 날짜 배지 표시 |
 | 설정 | 계좌 정보 및 현재 KRX 세션 상태 확인 |
 
 ### Streamlit 대신 Dash를 선택한 이유
