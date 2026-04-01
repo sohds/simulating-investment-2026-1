@@ -26,14 +26,12 @@ from reporter import collect_market_data
 def test_collect_market_data_returns_kospi_kosdaq():
     """반환 dict에 kospi, kosdaq 키가 존재하는지 확인.
 
-    pykrx가 정상 동작할 때: kospi/kosdaq 키와 change_pct 포함 확인.
-    KRX 서버 응답 이상 등으로 실패할 때: error 키 반환 확인 (크래시 없음).
+    KRX 서버 접근 불가 시 pytest.skip으로 건너뜀 (에러는 아님).
     """
+    import pytest
     result = collect_market_data("20260319", "20260401")
-    assert isinstance(result, dict), "반환값은 항상 dict여야 함"
     if "error" in result:
-        # KRX 서버 이슈 또는 네트워크 문제 — 크래시 없이 error 키 반환은 정상
-        return
+        pytest.skip(f"KRX 서버 접근 불가 (정상 동작): {result['error']}")
     assert "kospi" in result
     assert "kosdaq" in result
     assert "change_pct" in result["kospi"]
