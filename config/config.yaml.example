@@ -29,3 +29,8 @@ sell_rules:
 krx_session:
   jsessionid: "YOUR_JSESSIONID_HERE"   # data.krx.co.kr 로그인 후 복사
   extra_cookies: ""                    # __smVisitorID 등 추가 쿠키 (선택)
+
+report:
+  openai_api_key: "YOUR_OPENAI_KEY"   # platform.openai.com에서 발급
+  model: "gpt-4o-mini"
+  enabled: true

@@ -7,3 +7,4 @@ schedule
 finance-datareader
 dash
 dash-bootstrap-components
+openai
