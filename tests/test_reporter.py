@@ -73,3 +73,42 @@ def test_collect_supply_change_computes_delta():
         assert "005930" in result
         assert "prev_strength" in result["005930"]
         assert "curr_strength" in result["005930"]
+
+
+from reporter import save_report, build_prompt
+
+
+def test_save_report_creates_file():
+    """save_report가 파일을 생성하는지 확인."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = save_report("# 테스트 리포트\n내용", "20260401", report_dir=tmpdir)
+        assert os.path.exists(path)
+        assert open(path, encoding="utf-8").read() == "# 테스트 리포트\n내용"
+
+
+def test_build_prompt_contains_key_sections():
+    """build_prompt 결과에 필수 섹션이 포함되는지 확인."""
+    portfolio = {
+        "holdings": [{"종목명": "삼성전자", "매입단가": 70000, "현재가": 78000,
+                      "수익률": 11.4, "평가손익": 800000, "보유수량": 100}],
+        "total_eval": 10800000,
+        "total_pnl":  800000,
+        "deposit":    200000,
+    }
+    market = {
+        "kospi":  {"start": 2800.0, "end": 2923.5, "change_pct": 4.41},
+        "kosdaq": {"start": 840.0,  "end": 871.3,  "change_pct": 3.73},
+        "start_date": "20260319",
+        "end_date":   "20260401",
+    }
+    supply = {
+        "005930": {"종목명": "삼성전자", "prev_strength": 0.03, "curr_strength": 0.045, "change_pct": 50.0}
+    }
+    selected = pd.DataFrame(
+        [{"종목명": "삼성전자", "선정_가중치": 2}],
+        index=["005930"],
+    )
+    prompt = build_prompt(portfolio, market, supply, selected, group_name="G6")
+    assert "삼성전자" in prompt
+    assert "KOSPI" in prompt
+    assert "G6" in prompt
