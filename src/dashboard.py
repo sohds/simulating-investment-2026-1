@@ -203,7 +203,18 @@ app.layout = dbc.Container([
             dcc.Interval(id="interval-collect", interval=500, disabled=True),
         ], fluid=True)),
 
-        # ── 탭 4: 설정 ───────────────────────────────────────────────
+        # ── 탭 4: 리포트 ─────────────────────────────────────────────
+        dbc.Tab(label="리포트", tab_id="tab-report", children=dbc.Container([
+            dbc.Row([
+                dbc.Col(html.Span(id="report-date-badge"), className="mt-3 mb-2"),
+            ]),
+            dcc.Markdown(
+                id="report-content",
+                style={"fontFamily": "monospace", "fontSize": "14px"},
+            ),
+        ], fluid=True)),
+
+        # ── 탭 5: 설정 ───────────────────────────────────────────────
         dbc.Tab(label="설정", tab_id="tab-settings", children=dbc.Container([
             html.H6("계좌 설정", className="mt-3 mb-2"),
             html.Div(id="settings-content"),
@@ -484,6 +495,31 @@ def handle_collect(n_col, n_sel, n_both, n_int, collect_date, current_log):
     if done:
         new_log += "\n✅ 완료"
     return new_log, done, done, done, done
+
+
+@app.callback(
+    Output("report-content", "children"),
+    Output("report-date-badge", "children"),
+    Input("tabs", "active_tab"),
+)
+def update_report_tab(active_tab: str):
+    if active_tab != "tab-report":
+        return dash.no_update, dash.no_update
+
+    report_dir = ROOT / "logs" / "final-report"
+    if not report_dir.exists():
+        return "_리포트 없음. `python src/selector.py`를 실행하세요._", ""
+
+    files = sorted(report_dir.glob("report_*.md"), reverse=True)
+    if not files:
+        return "_리포트 없음. `python src/selector.py`를 실행하세요._", ""
+
+    latest  = files[0]
+    content = latest.read_text(encoding="utf-8")
+    raw_date = latest.stem.replace("report_", "")
+    date_fmt = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}"
+    badge = dbc.Badge(f"최신 리포트: {date_fmt}", color="info", className="fs-6")
+    return content, badge
 
 
 if __name__ == "__main__":
