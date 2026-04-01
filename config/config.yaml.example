@@ -32,5 +32,5 @@ krx_session:
 
 report:
   openai_api_key: "YOUR_OPENAI_KEY"   # platform.openai.com에서 발급
-  model: "gpt-4o-mini"
+  model: "gpt-5.4-mini"
   enabled: true
