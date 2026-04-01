@@ -36,3 +36,40 @@ def test_collect_market_data_returns_kospi_kosdaq():
     assert "kosdaq" in result
     assert "change_pct" in result["kospi"]
     assert "change_pct" in result["kosdaq"]
+
+
+import tempfile, csv
+from reporter import collect_supply_change
+
+
+def test_collect_supply_change_no_prev_returns_empty():
+    """직전 CSV가 없으면 빈 dict 반환."""
+    result = collect_supply_change("19000101", "19000102")
+    assert result == {}
+
+
+def test_collect_supply_change_computes_delta():
+    """두 CSV가 있으면 수급 강도 변화를 계산."""
+    # 임시 CSV 두 개 생성
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prev_path = os.path.join(tmpdir, "20260318.csv")
+        curr_path = os.path.join(tmpdir, "20260401.csv")
+
+        for path, short, long_ in [(prev_path, 100, 200), (curr_path, 150, 250)]:
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    "티커", "종목명", "외국인_단기_순매수", "외국인_장기_순매수",
+                    "기관_단기_순매수", "기관_장기_순매수", "시가총액", "거래대금", "평균거래대금",
+                ])
+                writer.writeheader()
+                writer.writerow({
+                    "티커": "005930", "종목명": "삼성전자",
+                    "외국인_단기_순매수": short, "외국인_장기_순매수": long_,
+                    "기관_단기_순매수": short, "기관_장기_순매수": long_,
+                    "시가총액": 400_000_000_000, "거래대금": 0, "평균거래대금": 0,
+                })
+
+        result = collect_supply_change("20260318", "20260401", data_dir=tmpdir)
+        assert "005930" in result
+        assert "prev_strength" in result["005930"]
+        assert "curr_strength" in result["005930"]

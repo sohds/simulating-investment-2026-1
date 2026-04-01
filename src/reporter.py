@@ -123,3 +123,66 @@ def collect_market_data(start_date: str, end_date: str) -> dict:
 
     except Exception as e:
         return {"error": str(e)}
+
+
+def collect_supply_change(
+    prev_date: str,
+    curr_date: str,
+    data_dir: str = "data/supply_demand",
+    float_ratio: float = 0.5,
+) -> dict:
+    """직전 그룹 vs 현재 그룹 수급 강도 변화 비교.
+
+    두 CSV 파일 모두 없으면 빈 dict 반환 (G5 첫 투자 등 엣지케이스).
+
+    Args:
+        prev_date: 직전 시그널 마감일 "YYYYMMDD"
+        curr_date: 현재 시그널 마감일 "YYYYMMDD"
+        data_dir:  supply_demand CSV 디렉토리 경로
+        float_ratio: 유동비율 (config에서 전달)
+
+    Returns:
+        {
+          ticker: {
+            "종목명": str,
+            "prev_strength": float,
+            "curr_strength": float,
+            "change_pct": float,
+          }, ...
+        }
+    """
+    prev_path = os.path.join(data_dir, f"{prev_date}.csv")
+    curr_path = os.path.join(data_dir, f"{curr_date}.csv")
+
+    if not os.path.exists(prev_path) or not os.path.exists(curr_path):
+        return {}
+
+    prev_df = pd.read_csv(prev_path, dtype={"티커": str}, encoding="utf-8-sig").set_index("티커")
+    curr_df = pd.read_csv(curr_path, dtype={"티커": str}, encoding="utf-8-sig").set_index("티커")
+
+    common = prev_df.index.intersection(curr_df.index)
+    if common.empty:
+        return {}
+
+    result = {}
+    for ticker in common:
+        prev_row = prev_df.loc[ticker]
+        curr_row = curr_df.loc[ticker]
+
+        def _strength(row: pd.Series) -> float:
+            net = float(row["외국인_단기_순매수"]) + float(row["기관_단기_순매수"])
+            cap = float(row["시가총액"]) * float_ratio
+            return round(net / cap, 6) if cap > 0 else 0.0
+
+        prev_s = _strength(prev_row)
+        curr_s = _strength(curr_row)
+        change = round((curr_s - prev_s) / abs(prev_s) * 100, 2) if prev_s != 0 else 0.0
+
+        result[ticker] = {
+            "종목명":        str(curr_row.get("종목명", ticker)),
+            "prev_strength": prev_s,
+            "curr_strength": curr_s,
+            "change_pct":    change,
+        }
+
+    return result
