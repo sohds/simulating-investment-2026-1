@@ -84,3 +84,42 @@ def collect_portfolio_pnl(config: dict) -> dict:
 
     except Exception as e:
         return {"error": str(e)}
+
+
+def collect_market_data(start_date: str, end_date: str) -> dict:
+    """pykrx로 KOSPI/KOSDAQ 지수 변화 수집.
+
+    Args:
+        start_date: 그룹 시작일 "YYYYMMDD"
+        end_date:   그룹 종료일(시그널 날) "YYYYMMDD"
+
+    Returns:
+        {
+          "kospi":  {"start": float, "end": float, "change_pct": float},
+          "kosdaq": {"start": float, "end": float, "change_pct": float},
+          "start_date": str,
+          "end_date":   str,
+        }
+        또는 {"error": str}
+    """
+    try:
+        from pykrx import stock
+
+        def _index_change(ticker: str) -> dict:
+            df = stock.get_index_ohlcv_by_date(start_date, end_date, ticker)
+            if df.empty:
+                return {"start": 0.0, "end": 0.0, "change_pct": 0.0}
+            start_val = float(df.iloc[0]["종가"])
+            end_val   = float(df.iloc[-1]["종가"])
+            change    = round((end_val - start_val) / start_val * 100, 2) if start_val else 0.0
+            return {"start": start_val, "end": end_val, "change_pct": change}
+
+        return {
+            "kospi":      _index_change("1001"),
+            "kosdaq":     _index_change("2001"),
+            "start_date": start_date,
+            "end_date":   end_date,
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
