@@ -211,6 +211,7 @@ __marimo__/
 CLAUDE.md
 
 # Project-specific
+docs/superpowers/               # 내부 설계/구현 계획 문서 (비공개)
 TO-DOs.md
 config/config.yaml              # 계좌번호 등 민감 정보 포함
 data/
