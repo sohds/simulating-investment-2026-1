@@ -270,6 +270,7 @@ class KiwoomAPI:
             print(f"  [주문 실패] {data.get('return_msg')}")
             return ""
 
+        time.sleep(1)  # API 과호출(429) 방지
         return str(data.get("ord_no", ""))
 
 
